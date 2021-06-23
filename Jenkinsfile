@@ -13,10 +13,9 @@ spec:
     - name: docker-sock
       hostPath:
         path: /var/run/docker.sock
-  imagePullSecrets:
-      - name: dev-imanuel-jenkins-regcred
   containers:
   - name: docker
+    imagePullPolicy: Always
     image: quay.imanuel.dev/dockerhub/library---docker:stable
     command:
     - cat
