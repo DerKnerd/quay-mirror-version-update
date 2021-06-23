@@ -32,19 +32,12 @@ spec:
         stage('Push') {
             steps {
                 container('docker') {
-                    sh "docker build -t quay.imanuel.dev/imanuel/kubernetes-version-checker:$BUILD_NUMBER -f ./Dockerfile ."
-                    sh "docker tag quay.imanuel.dev/imanuel/kubernetes-version-checker:$BUILD_NUMBER quay.imanuel.dev/imanuel/kubernetes-version-checker:latest"
-
-                    sh "docker tag quay.imanuel.dev/imanuel/kubernetes-version-checker:$BUILD_NUMBER iulbricht/kubernetes-image-version-checker:$BUILD_NUMBER"
-                    sh "docker tag quay.imanuel.dev/imanuel/kubernetes-version-checker:$BUILD_NUMBER iulbricht/kubernetes-image-version-checker:latest"
+                    sh "docker build -t quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER -f ./Dockerfile ."
+                    sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
 
                     withDockerRegistry(credentialsId: 'quay.imanuel.dev', url: 'https://quay.imanuel.dev') {
-                        sh "docker push quay.imanuel.dev/imanuel/kubernetes-version-checker:$BUILD_NUMBER"
-                        sh "docker push quay.imanuel.dev/imanuel/kubernetes-version-checker:latest"
-                    }
-                    withDockerRegistry(credentialsId: 'hub.docker.com', url: '') {
-                        sh "docker push iulbricht/kubernetes-image-version-checker:$BUILD_NUMBER"
-                        sh "docker push iulbricht/kubernetes-image-version-checker:latest"
+                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER"
+                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
                     }
                 }
             }
