@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,6 +23,11 @@ import (
 	"sync"
 )
 
+var quayServer = os.Getenv("QUAY_SERVER")
+var quayAccessToken = os.Getenv("QUAY_ACCESS_TOKEN")
+var quayApi = fmt.Sprintf("https://%s/api/v1/", quayServer)
+var quayMirrorNamespace = os.Getenv("QUAY_MIRROR_NAMESPACE")
+
 func contains(arr []string, str string) bool {
 	for _, a := range arr {
 		if a == str {
@@ -31,15 +37,9 @@ func contains(arr []string, str string) bool {
 	return false
 }
 
-type containerData struct {
-	container  apiv1.Container
-	parentName string
-	entityType string
+func checkIfImageMightBeMirror(image string) bool {
+	return strings.HasPrefix(image, fmt.Sprintf("%s/%s", quayServer, quayMirrorNamespace))
 }
-
-var quayServer = os.Getenv("QUAY_SERVER")
-var quayAccessToken = os.Getenv("QUAY_ACCESS_TOKEN")
-var quayApi = fmt.Sprintf("https://%s/api/v1/", quayServer)
 
 func main() {
 	var (
@@ -47,6 +47,11 @@ func main() {
 		config *rest.Config
 		err    error
 	)
+
+	if quayMirrorNamespace == "" {
+		quayMirrorNamespace = "dockerhub"
+	}
+
 	if os.Getenv("MODE") == "out" {
 		log.Println("MAIN:  Started in out cluster mode")
 		home := homedir.HomeDir()
@@ -65,28 +70,13 @@ func main() {
 	ignoreNamespacesVar := os.Getenv("IGNORE_NAMESPACES")
 	ignoreNamespaces := strings.Split(ignoreNamespacesVar, ",")
 
-	log.Printf("MAIN:  Found %d CPUs", runtime.NumCPU())
-	wg.Add(runtime.NumCPU())
-	containerChan := make(chan containerData)
-	logChan := make(chan string)
-
-	for i := 0; i < runtime.NumCPU(); i++ {
-		log.Printf("MAIN:  Start process on cpu %d", i)
-		go processContainer(wg, containerChan, logChan, i)
-	}
-
-	go func(logChan chan string) {
-		for logEntry := range logChan {
-			log.Println(logEntry)
-		}
-	}(logChan)
-
 	log.Println("MAIN:  Create clientset for configuration")
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 
+	var containers []string
 	log.Println("MAIN:  Look for deployments on kubernetes cluster")
 	deployments, err := clientset.AppsV1().Deployments(apiv1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
@@ -101,10 +91,8 @@ func main() {
 			}
 
 			for _, container := range deployment.Spec.Template.Spec.Containers {
-				containerChan <- containerData{
-					container:  container,
-					parentName: deployment.GetName(),
-					entityType: "deployment",
+				if !contains(containers, container.Image) && checkIfImageMightBeMirror(container.Image) {
+					containers = append(containers, container.Image)
 				}
 			}
 		}
@@ -124,10 +112,8 @@ func main() {
 			}
 
 			for _, container := range daemonSet.Spec.Template.Spec.Containers {
-				containerChan <- containerData{
-					container:  container,
-					parentName: daemonSet.GetName(),
-					entityType: "daemon set",
+				if !contains(containers, container.Image) && checkIfImageMightBeMirror(container.Image) {
+					containers = append(containers, container.Image)
 				}
 			}
 		}
@@ -147,10 +133,8 @@ func main() {
 			}
 
 			for _, container := range statefulSet.Spec.Template.Spec.Containers {
-				containerChan <- containerData{
-					container:  container,
-					parentName: statefulSet.GetName(),
-					entityType: "stateful set",
+				if !contains(containers, container.Image) && checkIfImageMightBeMirror(container.Image) {
+					containers = append(containers, container.Image)
 				}
 			}
 		}
@@ -170,13 +154,31 @@ func main() {
 			}
 
 			for _, container := range cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers {
-				containerChan <- containerData{
-					container:  container,
-					parentName: cronJob.GetName(),
-					entityType: "cron job",
+				if !contains(containers, container.Image) && checkIfImageMightBeMirror(container.Image) {
+					containers = append(containers, container.Image)
 				}
 			}
 		}
+	}
+
+	log.Printf("MAIN:  Found %d CPUs", runtime.NumCPU())
+	wg.Add(runtime.NumCPU())
+	containerChan := make(chan string, len(containers))
+	logChan := make(chan string)
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		log.Printf("MAIN:  Start process on cpu %d", i)
+		go processContainer(wg, containerChan, logChan, i)
+	}
+
+	go func(logChan chan string) {
+		for logEntry := range logChan {
+			log.Println(logEntry)
+		}
+	}(logChan)
+
+	for _, container := range containers {
+		containerChan <- container
 	}
 
 	close(containerChan)
@@ -185,12 +187,12 @@ func main() {
 	close(logChan)
 }
 
-func processContainer(wg *sync.WaitGroup, containerChan chan containerData, logChan chan string, idx int) {
+func processContainer(wg *sync.WaitGroup, containerChan chan string, logChan chan string, idx int) {
 	for c := range containerChan {
 		logf := func(message string, data ...interface{}) {
 			logChan <- fmt.Sprintf("CPU "+strconv.Itoa(idx)+": "+message, data...)
 		}
-		err := updateMirrorTag(c.container, logf)
+		err := updateMirrorTag(c, logf)
 		if err != nil {
 			logChan <- fmt.Sprintf("CPU %d: Error updating: %s", idx, err.Error())
 		}
@@ -199,9 +201,9 @@ func processContainer(wg *sync.WaitGroup, containerChan chan containerData, logC
 	wg.Done()
 }
 
-func updateMirrorTag(container apiv1.Container, logf func(message string, data ...interface{})) error {
+func updateMirrorTag(containerImage string, logf func(message string, data ...interface{})) error {
 	logLocal := func(message string, data ...interface{}) {
-		logf(fmt.Sprintf("Image: "+container.Image+"\t"+message, data...))
+		logf(fmt.Sprintf("Image: "+containerImage+" "+message, data...))
 	}
 	type updateMirrorData struct {
 		RootRule struct {
@@ -215,12 +217,11 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 	}
 
 	logLocal("Split image")
-	imageAndTag := strings.Split(container.Image, ":")
+	imageAndTag := strings.Split(containerImage, ":")
 	image := strings.TrimPrefix(imageAndTag[0], quayServer+"/")
-	quayImage := strings.Replace(image, "/", "---", 1)
 
 	logLocal("Create new details request")
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%srepository/dockerhub/%s?tags=true&stats=false", quayApi, quayImage), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%srepository/%s?tags=true&stats=false", quayApi, image), nil)
 	if err != nil {
 		return err
 	}
@@ -234,7 +235,10 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error %s", resp.Status)
+		var respBuf bytes.Buffer
+		_, _ = io.Copy(&respBuf, resp.Body)
+		logLocal(respBuf.String())
+		return fmt.Errorf("error in details request %s", resp.Status)
 	}
 
 	var repoDetails repositoryDetails
@@ -254,7 +258,8 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 		i++
 	}
 
-	tag, err := containerApi.GetLatestTag(image, logLocal)
+	dockerImage := strings.ReplaceAll(strings.Split(image, "/")[1], "---", "/")
+	tag, err := containerApi.GetLatestTag(dockerImage, logLocal)
 	if err != nil {
 		return err
 	}
@@ -290,7 +295,7 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 	}
 
 	logLocal("Create request to update mirror")
-	req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%srepository/dockerhub/%s/mirror", quayApi, quayImage), &encoded)
+	req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%srepository/%s/mirror", quayApi, image), &encoded)
 	if err != nil {
 		return err
 	}
@@ -305,11 +310,14 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("error %s", resp.Status)
+		var respBuf bytes.Buffer
+		_, _ = io.Copy(&respBuf, resp.Body)
+		logLocal(respBuf.String())
+		return fmt.Errorf("error in update request %s", resp.Status)
 	}
 
 	logLocal("Create mirror sync request")
-	req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%srepository/dockerhub/%s/mirror/sync-now", quayApi, quayImage), nil)
+	req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%srepository/%s/mirror/sync-now", quayApi, image), nil)
 	if err != nil {
 		return err
 	}
@@ -322,7 +330,10 @@ func updateMirrorTag(container apiv1.Container, logf func(message string, data .
 	}
 
 	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("error %s", resp.Status)
+		var respBuf bytes.Buffer
+		_, _ = io.Copy(&respBuf, resp.Body)
+		logLocal(respBuf.String())
+		return fmt.Errorf("error in sync request %s", resp.Status)
 	}
 
 	return nil
