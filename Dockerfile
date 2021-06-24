@@ -1,7 +1,11 @@
-FROM quay.imanuel.dev/dockerhub/library---golang:1.16-alpine
+FROM quay.imanuel.dev/dockerhub/library---golang:1.16-alpine as build
 WORKDIR /app
 COPY . .
 
-RUN go build -o /qauy-mirror-version-update
+RUN go build -o /quay-mirror-version-update .
 
-CMD ["/qauy-mirror-version-update"]
+FROM quay.imanuel.dev/dockerhub/library---alpine:latest
+
+COPY --from=build /quay-mirror-version-update /quay-mirror-version-update
+
+CMD ["/quay-mirror-version-update"]
