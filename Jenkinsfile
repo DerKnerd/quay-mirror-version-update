@@ -33,10 +33,17 @@ spec:
                 container('docker') {
                     sh "docker build -t quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER -f ./Dockerfile ."
                     sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
+                    sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER iulbricht/quay-mirror-version-update:$BUILD_NUMBER"
+                    sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER iulbricht/quay-mirror-version-update:latest"
 
                     withDockerRegistry(credentialsId: 'quay.imanuel.dev', url: 'https://quay.imanuel.dev') {
                         sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:$BUILD_NUMBER"
                         sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
+                    }
+
+                    withDockerRegistry(credentialsId: 'hub.docker.com', url: '') {
+                        sh "docker push iulbricht/quay-mirror-version-update:$BUILD_NUMBER"
+                        sh "docker push iulbricht/quay-mirror-version-update:latest"
                     }
                 }
             }
