@@ -266,7 +266,7 @@ func updateMirrorTag(containerImage string, logf func(message string, data ...in
 
 	logLocal("Split tag in tag and suffix")
 	splitTag := strings.Split(imageAndTag[1], "-")
-	if len(splitTag) > 1 {
+	if len(splitTag) > 1 && !strings.HasSuffix(tag, "-"+splitTag[1]) {
 		tag = tag + "-" + splitTag[1]
 	}
 
