@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"io"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ import (
 	"path/filepath"
 	"quay-mirror-version-update/containerApi"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -270,10 +272,29 @@ func updateMirrorTag(containerImage string, logf func(message string, data ...in
 		tag = tag + "-" + splitTag[1]
 	}
 
-	if !contains(originalTags, tag) {
-		originalTags = append(originalTags, tag)
+	keepOnlyLastTwoVersions := os.Getenv("ONLY_KEEP_TWO_LAST_VERSIONS") == "True" || os.Getenv("ONLY_KEEP_TWO_LAST_VERSIONS") == "true"
+	if keepOnlyLastTwoVersions {
+		targetTags := make([]string, 0)
+
+		versions := make([]*version.Version, 0)
+		for _, raw := range originalTags {
+			v, _ := version.NewVersion(raw)
+			if v != nil {
+				versions = append(versions, v)
+			} else {
+				targetTags = append(targetTags, raw)
+			}
+		}
+
+		sort.Sort(sort.Reverse(version.Collection(versions)))
+		targetTags = append(targetTags, tag)
+		targetTags = append(targetTags, versions[0].Original())
 	} else {
-		return nil
+		if !contains(originalTags, tag) {
+			originalTags = append(originalTags, tag)
+		} else {
+			return nil
+		}
 	}
 
 	updateMirrorPayload := updateMirrorData{
