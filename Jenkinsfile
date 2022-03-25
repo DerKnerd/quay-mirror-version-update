@@ -29,6 +29,9 @@ spec:
     }
     stages {
         stage('Push') {
+            when {
+                branch 'main'
+            }
             steps {
                 container('docker') {
                     sh "docker build -t quay.imanuel.dev/imanuel/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER -f ./Dockerfile ."

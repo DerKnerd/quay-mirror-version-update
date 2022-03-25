@@ -2,6 +2,8 @@ FROM quay.imanuel.dev/dockerhub/library---golang:1.18-alpine as build
 WORKDIR /app
 COPY . .
 
+RUN apk update
+RUN apk add git
 RUN go build -o /quay-mirror-version-update .
 
 FROM quay.imanuel.dev/dockerhub/library---alpine:latest

@@ -1,6 +1,6 @@
 module quay-mirror-version-update
 
-go 1.18
+go 1.17
 
 require (
 	github.com/hashicorp/go-version v1.4.0
