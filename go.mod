@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/hashicorp/go-version v1.5.0
 	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
+	k8s.io/apimachinery v0.24.1
 	k8s.io/client-go v0.24.0
 )
 
