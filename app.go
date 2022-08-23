@@ -272,10 +272,9 @@ func updateMirrorTag(containerImage string, logf func(message string, data ...in
 		tag = tag + "-" + splitTag[1]
 	}
 
+	targetTags := make([]string, 0)
 	keepOnlyLastTwoVersions := os.Getenv("ONLY_KEEP_TWO_LAST_VERSIONS") == "True" || os.Getenv("ONLY_KEEP_TWO_LAST_VERSIONS") == "true"
 	if keepOnlyLastTwoVersions {
-		targetTags := make([]string, 0)
-
 		versions := make([]*version.Version, 0)
 		for _, raw := range originalTags {
 			v, _ := version.NewVersion(raw)
@@ -288,10 +287,13 @@ func updateMirrorTag(containerImage string, logf func(message string, data ...in
 
 		sort.Sort(sort.Reverse(version.Collection(versions)))
 		targetTags = append(targetTags, tag)
-		targetTags = append(targetTags, versions[0].Original())
+		if len(versions) > 0 {
+			targetTags = append(targetTags, versions[0].Original())
+		}
 	} else {
 		if !contains(originalTags, tag) {
 			originalTags = append(originalTags, tag)
+			targetTags = originalTags
 		} else {
 			return nil
 		}
@@ -303,7 +305,7 @@ func updateMirrorTag(containerImage string, logf func(message string, data ...in
 			RuleValue []string `json:"rule_value"`
 		}{
 			RuleKind:  "tag_glob_csv",
-			RuleValue: originalTags,
+			RuleValue: targetTags,
 		},
 	}
 
