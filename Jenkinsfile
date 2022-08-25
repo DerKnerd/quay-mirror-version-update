@@ -39,14 +39,14 @@ spec:
                     sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER iulbricht/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER"
                     sh "docker tag quay.imanuel.dev/imanuel/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER iulbricht/quay-mirror-version-update:latest"
 
-                    withDockerRegistry(credentialsId: 'quay.imanuel.dev', url: 'https://quay.imanuel.dev') {
-                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER"
-                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
-                    }
-
                     withDockerRegistry(credentialsId: 'hub.docker.com', url: '') {
                         sh "docker push iulbricht/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER"
                         sh "docker push iulbricht/quay-mirror-version-update:latest"
+                    }
+
+                    withDockerRegistry(credentialsId: 'quay.imanuel.dev', url: 'https://quay.imanuel.dev') {
+                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:$BRANCH_NAME.$BUILD_NUMBER"
+                        sh "docker push quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
                     }
                 }
             }
