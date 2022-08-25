@@ -30,7 +30,7 @@ spec:
     stages {
         stage('Push') {
             when {
-                branch 'v1 '
+                branch 'v1'
             }
             steps {
                 container('docker') {
