@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/hashicorp/go-version v1.6.0
-	k8s.io/api v0.26.0
-	k8s.io/apimachinery v0.26.0
+	k8s.io/api v0.26.1
+	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.0
 )
 
