@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/hashicorp/go-version v1.6.0
 	k8s.io/api v0.26.3
-	k8s.io/apimachinery v0.26.3
+	k8s.io/apimachinery v0.27.0
 	k8s.io/client-go v0.26.3
 )
 
@@ -29,6 +29,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
