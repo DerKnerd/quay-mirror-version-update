@@ -1,0 +1,43 @@
+stages:
+  - test
+  - build
+
+test:
+  image: quay.imanuel.dev/dockerhub/library---golang:1.20-alpine
+  stage: test
+  script:
+    - go vet .
+    - go build -o kubernetes-deployment-version-checker
+
+docker-build:
+  image: quay.imanuel.dev/dockerhub/library---docker:stable
+  stage: build
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$QUAY_USER" -p "$QUAY_PASSWORD" quay.imanuel.dev
+    - docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PASSWORD"
+  script:
+    - docker build --pull -t "quay.imanuel.dev/imanuel/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}" -f ./Dockerfile .
+    - docker tag "quay.imanuel.dev/imanuel/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}" "quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
+    - docker tag "quay.imanuel.dev/imanuel/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}" "iulbricht/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}"
+    - docker tag "quay.imanuel.dev/imanuel/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}" iulbricht/quay-mirror-version-update:latest
+    - docker push "quay.imanuel.dev/imanuel/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}"
+    - docker push "quay.imanuel.dev/imanuel/quay-mirror-version-update:latest"
+    - docker push "iulbricht/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}"
+    - docker push "iulbricht/quay-mirror-version-update:latest"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      exists:
+        - Dockerfile
+
+binary-build-linux:
+  image: quay.imanuel.dev/dockerhub/library---golang:1.20-alpine
+  stage: build
+  script:
+    - go build -o quay-mirror-version-update
+  artifacts:
+    paths:
+      - kubernetes-deployment-version-checker
+  rules:
+    - if: $CI_COMMIT_BRANCH == "v2"
