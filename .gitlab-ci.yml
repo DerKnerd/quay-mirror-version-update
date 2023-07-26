@@ -27,7 +27,7 @@ docker-build:
     - docker push "iulbricht/quay-mirror-version-update:1.0.${CI_PIPELINE_IID}"
     - docker push "iulbricht/quay-mirror-version-update:latest"
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "v1"
       exists:
         - Dockerfile
 
@@ -40,4 +40,4 @@ binary-build-linux:
     paths:
       - kubernetes-deployment-version-checker
   rules:
-    - if: $CI_COMMIT_BRANCH == "v2"
+    - if: $CI_COMMIT_BRANCH == "v1"
